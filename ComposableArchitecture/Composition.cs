@@ -13,31 +13,50 @@ namespace ComposableArchitecture
         #region Backing fields
 
         private PageNavigationService _NavigationService;
-        private PersistentBool _IsTutorialCompleted;
-        private PersistentBool _TestAdsRequested;
+        private PersistentValue<bool> _IsTutorialCompleted;
+        private PersistentValue<bool> _TestAdsRequested;
         private ProdDevUri _LoginUri;
         private LoginService _LoginService;
         private NetworkDataSource<ContentA> _LatestContentAData;
 
         #endregion
 
-        private PageNavigationService NavigationService => _NavigationService ?? (_NavigationService =
-            new PageNavigationService()
+        #region Persistent values
+
+        private PersistentValue<bool> IsTutorialCompleted => _IsTutorialCompleted ?? (_IsTutorialCompleted =
+            new PersistentValue<bool>("isTutorialCompleted")
         );
 
-        private PersistentBool IsTutorialCompleted => _IsTutorialCompleted ?? (_IsTutorialCompleted =
-            new PersistentBool("isTutorialCompleted")
+        private PersistentValue<bool> TestAdsRequested => _TestAdsRequested ?? (_TestAdsRequested =
+            new PersistentValue<bool>("testAdsRequested")
         );
 
-        private PersistentBool TestAdsRequested => _TestAdsRequested ?? (_TestAdsRequested =
-            new PersistentBool("testAdsRequested")
-        );
+        #endregion
 
-        private ProdDevUri LoginUri => _LoginUri ?? (_LoginUri =
+        #region URIs
+
+        private static ProdDevUri LoginUri =
             new ProdDevUri(
                 prod: new Uri("www.me.com/login"),
                 dev: new Uri("www.me-dev.com/login")
-            )
+            );
+
+        private static ProdDevUri AnalyticsUri =
+            new ProdDevUri(
+                prod: new Uri("www.me.com/analytics"),
+                dev: new Uri("www.me-dev.com/analytics")
+            );
+
+        private static ProdDevUri BaseContentUri =
+            new ProdDevUri(
+                prod: new Uri("www.me.com/content/"),
+                dev: new Uri("www.me-dev.com/content/")
+            );
+
+        #endregion
+
+        private PageNavigationService NavigationService => _NavigationService ?? (_NavigationService =
+            new PageNavigationService()
         );
 
         private LoginService LoginService => _LoginService ?? (_LoginService =
@@ -46,21 +65,9 @@ namespace ComposableArchitecture
             )
         );
 
-        private ProdDevUri AnalyticsUri =
-            new ProdDevUri(
-                prod: new Uri("www.me.com/analytics"),
-                dev: new Uri("www.me-dev.com/analytics")
-            );
-
         private MemoryCache ContentMemoryCache = new MemoryCache();
 
         private DiskCache ContentDiskCache = new DiskCache();
-
-        private static ProdDevUri BaseContentUri =
-            new ProdDevUri(
-                prod: new Uri("www.me.com/content/"),
-                dev: new Uri("www.me-dev.com/content/")
-            );
 
         private ContentAEndpoint LatestContentAEndpoint =
             new ContentAEndpoint(
@@ -80,6 +87,14 @@ namespace ComposableArchitecture
 
         public PageViewModel Compose()
         {
+            var latestContentAReloadCommand = 
+                new UserCommandViewModel(
+                    label: "Reload",
+                    viewTemplate: "ReloadButton",
+                    icon: Icon.Refresh,
+                    actions: LatestContentAData.Reload
+                );
+
             return
                 new MultiViewPageViewModel(
                     new ViewViewModel(
@@ -88,7 +103,7 @@ namespace ComposableArchitecture
                         new ListViewModel(
                             viewTemplate: "MenuList",
 
-                            new SmallLoginViewModel(
+                            new LoginViewModel(
                                 LoginService
                             ),
 
@@ -96,7 +111,7 @@ namespace ComposableArchitecture
                                 label: "All the Content B!",
                                 viewTemplate: "MenuButton",
 
-                                () => {
+                                actions: () => {
                                     var dataSource =
                                         new PagedNetworkDataSource<ContentB>(
                                             new ContentBEndpoint(
@@ -116,7 +131,6 @@ namespace ComposableArchitecture
 
                                                 itemsSource:
                                                     dataSource
-                                                        .Items
                                                         .Select<ContentB, ViewModel>(b => {
                                                             switch (b) {
                                                                 case SuperContentB sb:
@@ -139,6 +153,7 @@ namespace ComposableArchitecture
                                                 new UserCommandViewModel(
                                                     "Reload",
                                                     "ReloadIcon",
+                                                    Icon.Refresh,
                                                     dataSource.Reload
                                                 )
                                         )
@@ -150,7 +165,7 @@ namespace ComposableArchitecture
                                 label: "Clear everything!",
                                 viewTemplate: "MenuButtonWithLoadingIndicator",
 
-                                () =>
+                                actions: () =>
                                     Task.WhenAll(
                                         IsTutorialCompleted.Clear(),
                                         ContentMemoryCache.Clear(),
@@ -170,49 +185,61 @@ namespace ComposableArchitecture
                     ),
 
                     new ViewViewModel(
-                        title: "Content A",
+                        title: "A Teaser",
 
                         new ListViewModel(
                             viewTemplate: "VerticalList",
                             
-                            itemsSource: 
+                            itemsSource:
                                 LatestContentAData
-                                    .Items
-                                    .Select(item => new SimpleListItemViewModel("BrandedListItem", item.Name, item.Text))
+                                    .Take(10)
+                                    .Select(item => new SimpleListItemViewModel("TeaserListItem", item.Name, item.Text))
                                     .StartWith<ViewModel>(new LoginBannerViewModel(LoginService.IsUserLoggedIn))
                         ),
 
-                        userCommands:
-                            new UserCommandViewModel(
-                                label: "Reload",
-                                viewTemplate: "MenuButtonWithLoadingIndicator",
-                                actions: LatestContentAData.Reload
-                            )
+                        userCommands: latestContentAReloadCommand
+                    ),
+
+                    new ViewViewModel(
+                        title: "All the A content",
+
+                        contentSource:
+                            Observable
+                                .CombineLatest(
+                                    LoginService.UserAccess.Select(v => v == ContentType.Premium),
+                                    IsTutorialCompleted)
+                                .Select<IList<bool>, ViewModel>(values => {
+                                    var access = values[0];
+                                    var tutorial = values[1];
+
+                                    if (!access) {
+                                        return 
+                                            new LoginViewModel(
+                                                LoginService,
+                                                viewTemplate: "LargeLogin");
+                                    }
+
+                                    if (!tutorial) {
+                                        return
+                                            new TutorialViewModel(
+                                                onCompleted: () => IsTutorialCompleted.Value = true
+                                            );
+                                    }
+
+                                    return
+                                        new ListViewModel(
+                                            viewTemplate: "VerticalList",
+
+                                            itemsSource:
+                                                LatestContentAData
+                                                    .Select<ContentA, ViewModel>(item => new ContentAViewModel(item))
+                                        );
+                                })
+                            
                     )
                 );
 
             /*
-            
-			        <ItemsViewModel
-				        TemplateName="VerticalListTemplate"
-				        ItemsSource={Bind ContentADataSource1.Take(10)}>
-				
-				        <ItemsViewModel.UserCommands>
-					        <Run Action={Bind ContentADataSource1.Reload()}
-				        </ItemsViewModel.UserCommands>
-				
-				        <ItemsViewModel.Header>
-					        <LoginBannerViewModel 
-						        IsVisible={Bind !MyLoginService.IsUserLoggedIn}
-						        LoginService={Bind MyLoginService} />
-				        </ItemsViewModel.Header>		
-				
-				        <ItemsViewModel.ItemTemplate>
-					        <ContentAListItemViewModel
-						        TemplateName="ContentATeaserTemplate" />
-				        </ItemsViewModel.ItemTemplate>
-				
-			        </ItemsViewModel>
 			
 			        <SwitchViewModel>
 

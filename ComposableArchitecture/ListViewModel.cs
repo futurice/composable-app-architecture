@@ -18,6 +18,7 @@ namespace ComposableArchitecture
         public ListViewModel(string viewTemplate = null, Action<float> onRelativePositionChanged = null, IObservable<ViewModel> itemsSource = null) : base(viewTemplate)
         {
         }
+
     }
 
     internal class LazyListViewModel<T> : ViewModel

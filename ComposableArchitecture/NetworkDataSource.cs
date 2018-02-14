@@ -4,9 +4,7 @@ using System.Threading.Tasks;
 
 namespace ComposableArchitecture
 {
-    internal class DataSource<T>
+    internal class DataSource<T> : IObservable<T>
     {
-        public IObservable<T> Items { get; internal set; }
-
     }
 }

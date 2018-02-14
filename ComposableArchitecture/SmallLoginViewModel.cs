@@ -1,8 +1,8 @@
 ﻿namespace ComposableArchitecture
 {
-    internal class SmallLoginViewModel : ViewModel
+    internal class LoginViewModel : ViewModel
     {
-        public SmallLoginViewModel(LoginService loginService)
+        public LoginViewModel(LoginService loginService, string viewTemplate = null) : base(viewTemplate)
         {
         }
     }

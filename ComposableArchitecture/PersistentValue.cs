@@ -4,9 +4,9 @@ using System.Threading.Tasks;
 
 namespace ComposableArchitecture
 {
-    internal class PersistentBool : ISubject<bool>
+    internal class PersistentValue<T> : ObservableValue<T>
     {
-        public PersistentBool(string v)
+        public PersistentValue(string persistencyKey)
         {
         }
 

@@ -7,5 +7,16 @@
         }
 
         public readonly ReadOnlyObservableValue<bool> IsUserLoggedIn;
+
+        public readonly ReadOnlyObservableValue<ContentType> UserAccess;
+
+
+    }
+
+
+    public enum ContentType
+    {
+        Free,
+        Premium
     }
 }

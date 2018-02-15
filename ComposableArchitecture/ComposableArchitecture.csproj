@@ -108,6 +108,7 @@
     <Compile Include="ContentBEndpoint.cs" />
     <Compile Include="DiskCache.cs" />
     <Compile Include="Endpoint.cs" />
+    <Compile Include="ExtensionsContainer.cs" />
     <Compile Include="ListItemViewModel.cs" />
     <Compile Include="ListViewModel.cs" />
     <Compile Include="LoginBannerViewModel.cs" />
@@ -119,6 +120,7 @@
     <Compile Include="MemoryCache.cs" />
     <Compile Include="MultiUri.cs" />
     <Compile Include="MultiViewPageViewModel.cs" />
+    <Compile Include="MyAnalyticsExtension.cs" />
     <Compile Include="NetworkDataSource.cs" />
     <Compile Include="NetworkDataSource1.cs" />
     <Compile Include="ObservableValue.cs" />

@@ -2,11 +2,9 @@
 {
     internal class SingleViewPageViewModel : PageViewModel
     {
-        private ListViewModel reloadableListViewModel;
 
-        public SingleViewPageViewModel(ListViewModel reloadableListViewModel, params UserCommandViewModel[] userCommands)
+        public SingleViewPageViewModel(string id = null, ViewModel content = null, params UserCommandViewModel[] userCommands) : base(id)
         {
-            this.reloadableListViewModel = reloadableListViewModel;
         }
     }
 }

@@ -10,6 +10,13 @@ namespace ComposableArchitecture
 {
     class Composition
     {
+        #region ids
+
+        private const string MENU = "Menu";
+        private const string DETAILS_PAGE = "DetailsPage";
+
+        #endregion
+
         #region Backing fields
 
         private PageNavigationService _NavigationService;
@@ -87,6 +94,18 @@ namespace ComposableArchitecture
 
         public PageViewModel Compose()
         {
+            ExtensionsContainer
+                .Instance
+                .Add(
+
+                    new MyAnalyticsExtension(AnalyticsUri) {
+                        { MENU, "main-menu" },
+                        { DETAILS_PAGE, "details-page-2" },
+                    }
+                
+                );
+         
+            
             var latestContentAReloadCommand = 
                 new UserCommandViewModel(
                     label: "Reload",
@@ -98,8 +117,10 @@ namespace ComposableArchitecture
             return
                 new MultiViewPageViewModel(
                     new ViewViewModel(
-                        title: "Menu",
+                        title: "Localized menu title",
+                        id: MENU,
 
+                        content:
                         new ListViewModel(
                             viewTemplate: "MenuList",
 
@@ -126,6 +147,8 @@ namespace ComposableArchitecture
 
                                     return NavigationService.Navigate(
                                         new SingleViewPageViewModel(
+                                            id: DETAILS_PAGE,
+                                            
                                             new ListViewModel(
                                                 viewTemplate: "VerticalList",
 
@@ -200,17 +223,20 @@ namespace ComposableArchitecture
                         userCommands: latestContentAReloadCommand
                     ),
 
+
                     new ViewViewModel(
                         title: "All the A content",
 
+                        userCommandsSource:
+                            ForAccessToPremiumAndTutorialCompleted(
+                                (access, tutorial) =>
+                                    access && tutorial
+                                        ? latestContentAReloadCommand.ToEnumerable()
+                                        : Enumerable.Empty<UserCommandViewModel>()),
+
                         contentSource:
-                            Observable
-                                .CombineLatest(
-                                    LoginService.UserAccess.Select(v => v == ContentType.Premium),
-                                    IsTutorialCompleted)
-                                .Select<IList<bool>, ViewModel>(values => {
-                                    var access = values[0];
-                                    var tutorial = values[1];
+                            ForAccessToPremiumAndTutorialCompleted<ViewModel>(
+                                (access, tutorial) => { 
 
                                     if (!access) {
                                         return 
@@ -239,43 +265,16 @@ namespace ComposableArchitecture
                     )
                 );
 
-            /*
-			
-			        <SwitchViewModel>
+        }
 
-				        <SwitchItem
-					        If={Bind MyLoginService.UserHasAccess(ContentType.Premium)}>
-				
-					        <LargeLoginViewModel 
-						        LoginService={Bind MyLoginService} />			
-				        </SwitchItem>
-				
-				        <SwitchItem
-					        If={Bind !IsTutorialCompleted}>
-				
-					        <TutorialViewModel
-						        OnCompleted={Bind IsTutorialCompleted.Set(true)} />			
-				        </SwitchItem>
-
-				        <SwitchItem>
-				
-					        <ContentBViewModel
-						        DataSource={Bind ContentBDataSource1} />				
-				        </SwitchItem>			
-			        </SwitchViewModel>
-		        </MultiViewPageViewModel>	
-	        </App.StartupPage>
-	
-	        <App.Extensions>
-		
-		        <3rdPartyAdSdkIntegration
-			        UseTestAds={Bind App.IsTestBuild & TestAdsRequested}
-			        SdkKey="alksdfjl23k3"/>
-		
-		        <AnalyticsExtension
-			        Endpoint={Bind MyAnalyticsEndpoint}/>
-	        </App.Extensions>	 
-            */
+        private IObservable<T> ForAccessToPremiumAndTutorialCompleted<T>(Func<bool, bool, T> select)
+        {
+            return
+                Observable
+                    .CombineLatest(
+                        LoginService.UserAccess.Select(v => v == ContentType.Premium),
+                        IsTutorialCompleted)
+                    .Select(b => select(b[0], b[1]));
         }
 
         private ToggleViewModel NewTestToggle(string title, ISubject<bool> value)
@@ -286,6 +285,25 @@ namespace ComposableArchitecture
                 offLabel: "Production",
                 isOn: value
             );
+        }
+
+
+        private IObservable<T> C<T>(T instance)
+        {
+            return
+                Observable.Return(instance);
+        }
+
+        private IObservable<T> C<T>(Func<T> factory)
+        {
+            return
+                Observable.Create<T>(observer =>
+                {
+                    var value = factory();
+                    observer.OnNext(value);
+                    observer.OnCompleted();
+                    return () => (value as IDisposable)?.Dispose();
+                });
         }
     }
 
